@@ -1,0 +1,16 @@
+# local environment variables
+.env
+
+# old files
+.old
+
+# debug files
+**debug**
+
+# chrome profiles
+profile
+
+# byte-compiled / dll files
+__pycache__/
+*.py[cod]
+*$py.class

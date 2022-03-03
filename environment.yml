@@ -1,0 +1,13 @@
+name: xero-env
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - ipykernel
+  - ipython
+  - python=3.10.2
+  - python-dotenv
+  - requests
+  - selenium
+  - tqdm
+  - webdriver-manager
