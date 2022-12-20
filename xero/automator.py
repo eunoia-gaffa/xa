@@ -1,6 +1,7 @@
 import os
 import shutil
 from datetime import datetime as dt
+from datetime import timedelta
 from time import sleep
 
 from selenium import webdriver
@@ -120,12 +121,12 @@ class XeroAutomator:
         y, m = str(ymd.year), ymd.strftime("%B")
 
         # select year
-        year_selector = Select(self.wait.automation_id_clickable(
+        year_selector = Select(self.find.automation_id(
             'time-entry-date-range-datepicker--yearselector'))
         year_selector.select_by_visible_text(y)
 
         # select month
-        month_selector = Select(self.wait.automation_id_clickable(
+        month_selector = Select(self.find.automation_id(
             'time-entry-date-range-datepicker--monthselector'))
         month_selector.select_by_visible_text(m)
 
@@ -170,6 +171,9 @@ class XeroAutomator:
         except:
             pass
 
+        # choose the date
+        self.time_entries_pick_date(date)
+
         # press new time entry button
         new_time_entry_button = self.find.automation_id(
             'projects-button-add-time')
@@ -181,7 +185,7 @@ class XeroAutomator:
         project_input.click()
         project_input.send_keys(project)
 
-        sleep(0.1)
+        sleep(1)
 
         project_button = self.wait.automation_id_clickable(
             'autocompleter-option')
@@ -189,7 +193,7 @@ class XeroAutomator:
 
         # choose task
         task_input = self.wait.automation_id_clickable(
-            'time-entry-modal-task-wrap---button')
+            'time-entry-modal-task-wrap--button')
         task_input.click()
 
         sleep(0.1)
@@ -205,28 +209,6 @@ class XeroAutomator:
         duration_input.click()
         duration_input.send_keys(str(hours))
 
-        # choose date
-        date_picker = self.find.automation_id('time-entry-modal-date')
-        date_picker.click()
-
-        # select year
-        year_selector = Select(self.wait.automation_id_clickable(
-            'time-entry-modal-date-datepicker-dropdown--yearselector'))
-        year_selector.select_by_visible_text(y)
-
-        # select month
-        month_selector = Select(self.wait.automation_id_clickable(
-            'time-entry-modal-date-datepicker-dropdown--monthselector'))
-        month_selector.select_by_visible_text(m)
-
-        # select day
-        day_options = (self.find.automation_id("time-entry-modal-date-datepicker-dropdown")
-                       .find_elements(By.CSS_SELECTOR, ".xui-datepicker--day"))
-        day_options_mapping = {d.find_element(By.TAG_NAME, 'time').get_attribute(
-            'datetime'): d for d in day_options}
-
-        day_options_mapping[date].click()
-
         # save
         save_button = self.wait.automation_id_clickable(
             'time-entry-modal-save-button-group-save-button')
@@ -234,17 +216,38 @@ class XeroAutomator:
 
         print("Success!")
 
+    def new_time_entry_safe(self, project: str, task: str, date: str, hours: int = 8):
+        # get current hours
+        hours_curr = self.check_hours(date)
+        if hours_curr != "0:00":
+            print(f"Already have time entries for {date}: {hours_curr}")
+        else:
+            # try to add an 8 hour entry up to 3 times
+            retry(self.new_time_entry, 3, project, task, date, hours)
+
     def eight_hours_today(self):
         # get today's date
         today = dt.today().strftime("%Y-%m-%d")
-        hours_today = self.check_hours(today)
-        if hours_today != "0:00":
-            print(f"Already have time entries for today: {hours_today}")
-            return
+        project = self.config["DEFAULT_PROJECT"]
+        task = self.config["DEFAULT_TASK"]
 
-        # try to add an 8 hour entry up to 3 times
-        retry(self.new_time_entry, 3,
-              self.config["DEFAULT_PROJECT"], self.config["DEFAULT_TASK"], today, 8)
+        self.new_time_entry_safe(project, task, today, 8)
+
+    def fill_range(self, start: str, end: str):
+        project = self.config["DEFAULT_PROJECT"]
+        task = self.config["DEFAULT_TASK"]
+
+        # parse date
+        start_ymd = dt.strptime(start, "%Y-%m-%d")
+        end_ymd = dt.strptime(end, "%Y-%m-%d")
+        
+
+        delta = end_ymd - start_ymd
+
+        for d in range(delta.days + 1):
+            curr_date = start_ymd + timedelta(d)
+            if curr_date.weekday() < 5:
+                self.new_time_entry_safe(project, task, curr_date.strftime("%Y-%m-%d"), 8)
 
     def __del__(self):
         self.driver.quit()
